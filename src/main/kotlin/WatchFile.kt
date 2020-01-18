@@ -1,7 +1,8 @@
 package com.seansoper.zebec
 
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import java.io.File
 import java.nio.file.FileSystems
 import java.nio.file.Path
@@ -21,25 +22,22 @@ class WatchFile(paths: List<Path>, val extensions: List<String>) {
 
     data class ChangedFile(val path: Path, val extension: String)
 
-    suspend fun createChannel(): Channel<ChangedFile> {
-        val channel = Channel<ChangedFile>()
-        val scope: CoroutineScope = GlobalScope
-
-        scope.launch(Dispatchers.IO) {
-            while (true) {
-                val key = watchService.take()
-                val dirPath = key.watchable() as? Path ?: break
-                key.pollEvents().forEach {
-                    val path = dirPath.resolve(it.context() as Path)
-                    matches(path)?.let { extension ->
-                        channel.send(ChangedFile(path, extension))
+    suspend fun watchChanges(): Flow<ChangedFile> {
+        return flow {
+            withContext(Dispatchers.IO) {
+                while (true) {
+                    val key = watchService.take()
+                    val dirPath = key.watchable() as? Path ?: break
+                    key.pollEvents().forEach {
+                        val path = dirPath.resolve(it.context() as Path)
+                        matches(path)?.let { extension ->
+                            emit(ChangedFile(path, extension))
+                        }
                     }
+                    key.reset()
                 }
-                key.reset()
             }
         }
-
-        return channel
     }
 
     private fun matches(path: Path): String? {

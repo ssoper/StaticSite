@@ -1,5 +1,6 @@
 package com.seansoper.zebec
 
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.runBlocking
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
@@ -39,16 +40,14 @@ object Core {
             exitProcess(1)
         }
 
-        val channel = watch.createChannel()
+        val changes = watch.watchChanges()
 
         if (verbose) {
             watch.paths.forEach { println("Watching $it") }
             println("Filtering on files with extensions ${extensions.joinToString()}")
         }
 
-        while (true) {
-            val changed = channel.receive()
-
+        changes.collect { changed ->
             if (verbose) {
                 println("Change detected at ${changed.path}")
             }
